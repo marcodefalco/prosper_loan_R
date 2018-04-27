@@ -1,0 +1,723 @@
+---
+output:
+  html_document: default
+  pdf_document: default
+---
+Prosper Loan Data EDA by MARCO DE FALCO
+========================================================
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, packages}
+# Load all of the packages that you end up using in your analysis in this code
+# chunk.
+
+# Notice that the parameter "echo" was set to FALSE for this code chunk. This
+# prevents the code from displaying in the knitted HTML output. You should set
+# echo=FALSE for all code chunks in your file, unless it makes sense for your
+# report to show the code that generated a particular plot.
+
+# The other parameters for "message" and "warning" should also be set to FALSE
+# for other code chunks once you have verified that each plot comes out as you
+# want it to. This will clean up the flow of your report.
+
+library(ggplot2)
+library(dplyr)
+library(gridExtra)
+```
+
+```{r echo=FALSE, Load_the_Data}
+# Load the Data
+pl <- read.csv('prosperLoanData.csv')
+```
+
+# General Info About the Prosper Loan Data:
+
+Prosper is an online loan platform. The data refers to loans issued from July
+2009 onwards. the dataset has many features varying in kind and scope, sometimes
+referring to characteristics of the loan itself and some other referring to the
+borrowers.
+
+# Univariate Plots Section
+
+To get more general info about the dataset I will run some basic function.
+```{r echo=FALSE, Univariate_Plots_1}
+dim(pl)
+```
+
+81 features seem like a lot of columns!
+So the dataset contains almost 114,000 observations across 81 variables. 
+For my analysis I will explore only a fraction of these varibles, focusing
+solely on those that I found interesting.  More specifically, I will 
+investigate the following:  
+"BorrowerRate", "ProsperRating..Alpha.", "ProsperScore",
+"BorrowerState", "ListingCategory..numeric.", "CurrentDelinquencies", 
+"DelinquenciesLast7Years", "StatedMonthlyIncome",
+"IncomeRange", "IsBorrowerHomeowner", "TradesNeverDelinquent..percentage.", 
+"EmploymentStatus".
+
+```{r echo=FALSE, Univariate_Plots_3}
+pl2 <- subset(pl, select=c("BorrowerRate", "ProsperRating..Alpha.", 
+                           "ProsperScore",
+"BorrowerState", "ListingCategory..numeric.", "CurrentDelinquencies", 
+"DelinquenciesLast7Years", "StatedMonthlyIncome",
+"IncomeRange", "IsBorrowerHomeowner", "TradesNeverDelinquent..percentage.", 
+"EmploymentStatus"))
+str(pl2)
+```
+
+I have preferred to crete a separate dataframe with the variables of choice.
+The 12 variables selected are of different kinds:
+Some are categorical: "BorrowerState", "IncomeRange", "IsBorrowerHomeowner"
+"ProsperRating..Alpha.".
+The rest appears to be intervals, assuming the intervals between values in 
+ProsperScore are evenly spaced. In any case, we should
+investigate further to gain a better understanding of each.
+
+```{r echo=FALSE, Univariate_Plots_4}
+summary(pl2)
+```
+
+Above I draw some very basic sumary statistics.
+In fact, 
+it is useful to have some summary statistics at hand, while we will explore
+the different features and correlations.
+
+```{r echo=FALSE, Univariate_Plots_5, message=F, warning=F}
+qplot(x = BorrowerRate, data = pl2,  binwidth = .005,color = I("#283149"),
+      fill = I("#DA0463")) + xlim(0,quantile(pl2$BorrowerRate, 0.999)) +
+      xlab('Borrower Rate')
+#half a percent bin
+#Plotting 99.5% of the data, excluding the top 0.5%
+```
+
+*Borrower Rate* - The plot shows something unexpected: a spike at around 32% 
+interest. There are many more loans with a ~32% borrower rate than any other 
+rate.
+Hopefully we can learn why with further explorations.
+I excluded from the plot the top 0.1% rates, as I deemed them outliers.
+
+```{r echo=FALSE, Univariate_Plots_6, message=F, warning=F}
+#First we need to change the levels of the Rating
+pl2$ProsperRating..Alpha. <- factor(pl2$ProsperRating..Alpha.,
+                                    levels=c("AA", "A","B","C", "D","E",
+                                             "HR", ""))
+
+#levels(pl2$ProsperRating..Alpha.) <- c("AA", "A","B","C", "D","E",  "HR", "")
+qplot(x = ProsperRating..Alpha., data = pl2, color = I("#283149"),
+      fill = I("#DA0463")) + xlab('Prosper Rating')
+```
+
+*ProsperRating..Alpha.* - The  Prosper Rating assigned at the time the listing
+was created: 
+
+N/A, HR, E, D, C, B, A, AA. 
+
+It is important to 
+state that the Prosper Rating is 
+a different variable from the Prosper Score, yet we don't
+know how or why, as they look similar in aim,
+so we should further explor their relationship.
+
+```{r echo=FALSE, Univariate_Plots_6b, message=F, warning=F}
+qplot(x = as.factor(ProsperScore), data = pl2, color = I("#283149"),
+      fill = I("#DA0463")) + xlab('Prosper Score')
+```
+
+*ProsperScore* - The description says "ProsperScore is a custom risk score 
+built using historical Prosper data. The score ranges from 1-10, with 10 being 
+the best, or lowest risk score." This is inconsistent with the plot: Max.:11.00,
+and it's no outlier. The Prosper Score has been treated here as a factor.
+
+It will be useful to compare, later in the report *ProsperScore* with
+*ProsperRating..Alpha.* as the purpose seems to be the same.
+
+
+```{r echo=FALSE, Univariate_Plots_7}
+BorrowerState <- reorder(pl2$BorrowerState,pl2$BorrowerState,FUN=length)
+#sort(table(BorrowerState))
+qplot(x = BorrowerState, color = I("#283149"),
+      fill = I("#DA0463")) + xlab("Borrower's State") +
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+*BorrowerState* - It looks like there are twice as many loans from borrowers in 
+CA than from any other state. There are many possible
+reasons why this has occurred:
+Perhaps ProsperLoans is most known
+in California, or maybe in some states people tend
+to borrow more and so on. Most importantly, California is the most popoulous
+state of the US. There are 52 entries, As it includes DC and an unspecified 
+value.
+
+
+```{r echo=FALSE, Univariate_Plots_8}
+ListingCategory <- reorder(pl2$ListingCategory..numeric.,pl2$ListingCategory..numeric.,FUN=length)
+#sort(table(ListingCategory))
+qplot(x = ListingCategory, color = I("#283149"),
+      fill = I("#DA0463")) + xlab("Listing Category") + 
+  scale_x_discrete(breaks = seq(0, 20, by = 1))
+```
+
+*ListingCategory* - The description states:
+The category of the listing that the borrower selected when posting their
+listing:
+
+0 - Not Available, 1 - Debt Consolidation, 2 - Home Improvement, 3 - Business,
+4 - Personal Loan, 5 - Student Use, 6 - Auto, 7- Other,
+8 - Baby&Adoption, 9 - Boat, 10 - Cosmetic Procedure, 11 - Engagement Ring,
+12 - Green Loans, 13 - Household Expenses, 14 - Large Purchases,
+15 - Medical/Dental, 16 - Motorcycle, 17 - RV, 18 - Taxes,
+19 - Vacation, 20 - Wedding Loans
+
+I was disappointed from the outcome: I believed I was going to see for
+what specific purpose people are borrowing money. 
+However, the vast majority asks for a loan to consolidate
+(restructure or rearrange), previously issued debt, which tells us nothing about
+why they owe money in the first place. Likewise, the second and third highest 
+bins read "Not Available" and "Other", far from informative.
+
+I decided to plot the bins in ascending order (rather than in the logical order
+0-20) because it's useful to see how certain value counts compare to others.
+
+
+```{r  echo=FALSE, Univariate_Plots_9, , message=F, warning=F}
+CD_l <- qplot(data= pl2, x = log10(pl2$CurrentDelinquencies +1), binwidth = 0.25,
+      color = I("#283149"),
+      fill = I("#DA0463")) + xlab("Current Delinquencies (Log10 Scale)")
+
+PD_l <-qplot(data= pl2, x = log10(pl2$DelinquenciesLast7Years +1), binwidth = 0.25,
+      color = I("#283149"),
+      fill = I("#DA0463")) +
+  xlab("Delinquencies in the past 7 years (Log10 Scale)") 
+grid.arrange(CD_l, PD_l, ncol= 2)
+```
+
+*CurrentDelinquencies* - I had to plot this on a Log scale as 
+the distribution is
+EXTREMELY skewed.
+The almost totality of loans are issued to people who do not have current
+delinquencies.
+
+*DelinquenciesLast7Years* - A similar skewedness appears here. almost everyone
+had
+0 delinquencies in their recent history. It is important to say that although
+the
+rest of the data (the non 0 values) looks centered around 10 in a sort of normal
+fashion, in reality we should keep in mind that it's not so "normal" as it's 
+plotted on a log scale.
+
+```{r  echo=FALSE, Univariate_Plots_10, , message=F, warning=F}
+qplot(data= pl2, x = pl2$TradesNeverDelinquent..percentage., binwidth = 0.01,
+      color = I("#283149"),
+      fill = I("#DA0463")) +
+  xlab("% of never delinquent trades (Log10 Scale)") 
+```
+
+*TradesNeverDelinquent..percentage.* - Conversely, if almost everyone has no 
+delinquencies (and neither they have had),
+the vast majority of loans have been issued
+to people that did not trade delinquently. We must rember that a delinquent
+trade is a trade performed beyond the delinquency line set for that specific
+line of credit. 
+
+```{r  echo=FALSE, Univariate_Plots_11, message=F, warning=F}
+
+qplot(data= pl2, x = pl2$StatedMonthlyIncome, binwidth = 500,
+      color = I("#283149"),
+      fill = I("#DA0463")) +
+  xlim(0,quantile(pl2$StatedMonthlyIncome, 0.99)) +
+  xlab("Stated Monthly Income in USD") 
+```
+
+*StatedMonthlyIncome* - Self explanatory.
+The mode is 3,500 USD. I arbitrarily capped the data at
+20,000 USD as there were extreme outliers for borrowers that had 6-digits monthly 
+incomes.
+
+```{r  echo=FALSE, Univariate_Plots_12}
+
+pl2$IncomeRange <- factor(pl2$IncomeRange, levels=c("$0", "$1-24,999", "$25,000-49,999",
+                                                    "$50,000-74,999", "$75,000-99,999",
+                                                    "$100,000+", "Not displayed",
+                                                    "Not employed"))
+                         
+qplot(data= pl2, x = pl2$IncomeRange,
+      color = I("#283149"),
+      fill = I("#DA0463")) +
+  xlab("Borrowers Income Ranges") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+*IncomeRange* - the bulk of the data hovers between 25k USD and 75k USD, which
+is actually within the range that I expected.
+
+```{r  echo=FALSE, Univariate_Plots_13}
+qplot(data= pl2, x = pl2$EmploymentStatus,
+      color = I("#283149"),
+      fill = I("#DA0463")) +
+  xlab("Borrower Employment Status") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+*EmploymentStatus* - The categories are hard to interpret: It is not clear why
+"Employed" should be different from "Full-Time" for instance, rather, it would
+be more common sense to consider "Full-Time" as a sub category of Employed.
+It is possible that often the data collected from the Borrower was not
+ specific enough to indicate the kind of employment.
+
+*IsBorrowerHomeOwner* - I believe it does not make a ton of sense to 
+explore this variable visually as the summary table already does a good job in
+telling us how the dataset is distributed: 
+
+57478 Borrowers do own a house.
+
+56459 Borrowers do not own a house.
+
+# Univariate Analysis
+
+### What is the structure of your dataset?
+
+The dataset I have subsetted has 113937 listings of loans from the Prosper Loan 
+platform. There are 12 features: "BorrowerRate", "ProsperRating..Alpha.", 
+"ProsperScore",
+"BorrowerState", "ListingCategory..numeric.", "CurrentDelinquencies", 
+"DelinquenciesLast7Years", "StatedMonthlyIncome",
+"IncomeRange", "IsBorrowerHomeowner", "TradesNeverDelinquent..percentage.", 
+"EmploymentStatus".
+
+### What is/are the main feature(s) of interest in your dataset?
+The main features of interest in my EDA will be the Borrower Rate together with
+the Prosper Rating and the Prosper Score. I want to explore the correlations
+between these variables and see how they interact with other features related
+to the personal aspects of a borrower's life (more below).
+
+### What other features in the dataset do you think will help support your \
+investigation into your feature(s) of interest?
+All the other selected variables tell us something about the personal life of
+the borrower (e.g. where he lives, his income, why he needs the money, if
+he owns a house, if he is a good borrower and a timely payer). I think all
+this information might be correlated with the rate at which the borrower pays
+back money and the rating/score he has.
+
+
+### Did you create any new variables from existing variables in the dataset?
+No, however, I plan on readjusting the levels of some categorical variables
+along the way.
+
+### Of the features you investigated, were there any unusual distributions? \
+Did you perform any operations on the data to tidy, adjust, or change the form \
+of the data? If so, why did you do this?
+
+As shown, some distributions were extremely skewed. In a few instances I used
+a different scal to plot the data in a more meaningful way. In some other 
+instances, weird distributions in categorical data were due to bad data or other
+issues unknown to the writer.
+
+In some visualizations I have rearranged the order of the entries. 
+For IncomeRange
+it was necessary as the default visualization provided a random, non progressive
+order.
+
+In BorrowerState and ListingCategory..numeric. I adjusted the order to make the 
+distribution of data more visible and comparable.
+
+# Bivariate Plots Section
+
+```{r echo=FALSE, Bivariate_Plots , message=F, warning=F}
+ggplot(aes(y = pl2$CurrentDelinquencies, x = pl2$DelinquenciesLast7Years),
+       data = pl2) + 
+ geom_point(alpha = 1/25, color = I('#DA0463'), position = position_jitter())  + 
+ coord_trans(y = 'sqrt') +
+ geom_line(stat = 'summary', fun.y = mean, color = I("#283149") ) +
+  ylim(0, 30) + xlim(0, 70) + xlab("Delinquencies in the Last 7 Years") +
+  ylab("Current Delinquencies")
+
+# Limits are arbitrily removing outliers
+# DelinquenciesLast7Years caps at 100.
+```
+
+One of the things I wanted to first investigate is the correlation between
+past and present delinquencies. From the plot above would seem that the more
+you have been delinquent in the past, the more you tend to be today. However,
+we should keep in mind that we are not performing any statistical test to 
+determine the significance of this event.
+
+```{r echo=FALSE, message=F, warning=F}
+CD <- ggplot(aes(x = pl2$CurrentDelinquencies, y = pl2$BorrowerRate),
+       data = pl2) + xlim(0, 30) +  ylim(0.05, quantile(pl2$BorrowerRate, .995)) +
+ geom_point(alpha = 1/25, color = I('#DA0463'), position = position_jitter())  + 
+ coord_trans(x = 'sqrt') +
+ geom_smooth(color = I("#283149")) + ylab( "Borrower Rate") +
+  xlab("Current Delinquencies")
+PD <-ggplot(aes(x = pl2$DelinquenciesLast7Years, y = pl2$BorrowerRate),
+       data = pl2) + xlim(0, 70) +  ylim(0.05, quantile(pl2$BorrowerRate, .995)) +
+ geom_point(alpha = 1/25, color = I('#DA0463'), position = position_jitter())  + 
+ coord_trans(x = 'sqrt') +
+ geom_smooth(color = I("#283149")) + ylab( "Borrower Rate") +
+  xlab("Delinquencies in the Last 7 Years")
+
+grid.arrange(CD,PD,ncol=2)  
+```
+
+Does being delinquent affect the rate at which you borrow money? It would look
+like there is some positive correlation between your repay rate ande 
+both your present and past behaviour in terms of delinquencies. Again, we should
+be performing a statistical test in order to reinforce our suspects.
+
+I arbitrarily capped the data above 30 and 70 delinquencies (current and past
+respectively), in order to eliminate outliers.
+
+```{r  echo=FALSE, message=F, warning=F}
+ggplot(aes(x = as.factor(pl2$ListingCategory..numeric.), y = (pl2$BorrowerRate),
+           fill = I('#f3f3f3'), color = I('#DA0463')), 
+       data = pl2) +
+  geom_boxplot(lwd = 0.50, outlier.color = I("#283149"), outlier.shape = 1) +
+  stat_summary(fun.y=mean, colour=I("#283149"), geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+  scale_x_discrete() + 
+   scale_y_continuous() + 
+  xlab('Listing Category') + ylab('Borrower Rate')
+```
+
+**An useful legend:**
+
+0 - Not Available, 1 - Debt Consolidation, 2 - 
+Home Improvement, 3 - Business,
+4 - Personal Loan, 5 - Student Use, 6 - Auto, 7- Other,
+8 - Baby&Adoption, 9 - Boat, 10 - Cosmetic Procedure, 11 - Engagement Ring,
+12 - Green Loans, 13 - Household Expenses, 14 - Large Purchases,
+15 - Medical/Dental, 16 - Motorcycle, 17 - RV, 18 - Taxes,
+19 - Vacation, 20 - Wedding Loans
+
+I was stroke by the mean and median rate difference between 9 and 10.
+However, before jumping to the conclusion that it's better to take a loan
+for a catamaran than for a nose job,  we should take a closer look to the 
+*ListingCategory..numeric.* univariate plot above: 9 and 10 are indeed bins
+with very few observation, therefore, this high difference in rate can be the
+result of chance (e.g. non statistically significant).
+
+Another important thing to notice is that the very frequent 32% rate
+is not due to a specific category of loans.
+
+```{r  echo=FALSE}
+BRvsPR <- ggplot(aes(x = pl2$ProsperRating..Alpha., y = (pl2$BorrowerRate),
+           fill = I('#f3f3f3'), color = I('#DA0463')), 
+       data = pl2) +
+  geom_boxplot(lwd = 0.50, outlier.color = I("#283149"), outlier.shape = 1) +
+   scale_y_continuous() + 
+  xlab('Prosper Rating') + ylab('Borrower Rate')
+
+BRvsPS <- ggplot(aes(x = as.factor(pl2$ProsperScore), y = (pl2$BorrowerRate),
+           fill = I('#f3f3f3'), color = I('#DA0463')), 
+       data = pl2) +
+  geom_boxplot(lwd = 0.50, outlier.color = I("#283149"), outlier.shape = 1) +
+  scale_x_discrete() + 
+   scale_y_continuous() + 
+  xlab('Prosper Score') + ylab('Borrower Rate')
+
+grid.arrange(BRvsPR, BRvsPS, ncol = 2)
+```
+
+This is interesting. There is a very similar kind of
+correlation between the Borrower Rate and either Prosper Rating and Prosper 
+Score. This in turn raises another question: If both these variables measure
+vitually the same thing, why would they need a double? Maybe they wanted a more
+granular view of the same kind of information, using a scale from 1 to 11 
+instead of another from HR to AA (7 levels). However, we can't exactly say why,
+neither we know why, on average,
+a score of 5 is worse than a score of 4 when it comes to 
+Borrower Rate.
+
+```{r  echo=FALSE, message=F, warning=F}
+ggplot(aes(x = pl2$IsBorrowerHomeowner, y = (pl2$BorrowerRate),
+           fill = I('#f3f3f3'), color = I('#DA0463')), 
+       data = pl2) +
+  geom_boxplot(lwd = 0.50, outlier.color = I("#283149"), outlier.shape = 1) +
+  stat_summary(fun.y=mean, colour=I("#283149"), geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+  scale_x_discrete() + 
+   scale_y_continuous() + 
+  xlab('Borrower Home Owner') + ylab('Borrower Rate')
+```
+
+As one would expect, it seems that on average, it is better to own
+a house when asking for a loan. However, the difference is very slight.
+I believe that the ownership of a house is an interesting 
+feature and I would like to investigate it more in correlation with other 
+variables.
+
+```{r  echo=FALSE, message=F, warning=F}
+ggplot(aes(y = (pl2$TradesNeverDelinquent..percentage.), 
+           x = as.factor(pl2$ProsperScore),
+         fill = I('#f3f3f3'), color = I('#DA0463')), 
+       data = pl2) +
+  geom_boxplot(lwd = 0.50, outlier.color = I("#283149"), outlier.shape = 1) +
+  scale_x_discrete() + 
+  stat_summary(fun.y=mean, colour=I("#283149"), geom="point", 
+               shape=18, size=3,show_guide = FALSE) +
+  coord_flip() +
+  xlab('Prosper Score') + ylab('% of never delinquent trades')
+```
+
+The higher the Prosper Score, the higher the percentage of positive behavior in
+terms of delinquencies. There is an interesting aspect to notice in the plot:
+the entries that do not present a Score (labeled NA in the plot) hold the worst 
+TradesNeverDelinquent ratio. This fact makes me question the 
+idea that the unlabeled data was merely bad data, or entries
+that ProsperLoan failed to categorize with a specific score. From this
+perspective, "NA" seems like an actual bin, with mean and 
+median just a bit below the Score 1.
+
+# Bivariate Analysis
+
+### Talk about some of the relationships you observed in this part of the \
+investigation. How did the feature(s) of interest vary with other features in \
+the dataset?
+
+We have discovered some interesting correlations, to summarize a few:
+
+- As delinquencies (present and past) increase, so does the Borrower Rate.
+
+- As Prosper Score and Prosper Rating increase, the Borrower Rate decreases.
+
+- As the proportion of the proportions of non delinquent trades /total trades
+approaches 100%, the Prosper Score increases.
+
+### Did you observe any interesting relationships between the other features \
+(not the main feature(s) of interest)?
+
+Yes, amongst the features that lied outside the main variables of interest, I 
+found that 
+past and current delinquencies are positively correlated with each other.
+
+### What was the strongest relationship you found?
+
+The relation between *BorrowerRate* and *ProsperRating* appears to be the
+strongest and the most consistent. Moreover, the symmetry of ProsperScore and
+ProsperRating is evident, especially when we relate it to *BorrowerRate*. 
+However, we must add that we had not compared the rating and the score with all
+the variables of the dataset, therefore, some difference might be there although
+not visible up until now.
+
+# Multivariate Plots Section
+
+```{r  echo=FALSE, Multivariate_Plots}
+BRvPR_H <- ggplot(aes(x = pl2$ProsperRating..Alpha., y = pl$BorrowerRate,
+           color = pl$IsBorrowerHomeowner), data = pl2) + 
+ geom_boxplot() + scale_colour_manual(values = c('#DA0463', "#283149")) +
+  xlab('Prosper Rating') + ylab('Borrower Rate') +
+  labs(color = "Borrower Owns a Home")
+
+BRvIR_H <- ggplot(aes(y = pl2$BorrowerRate, x = pl2$IncomeRange,
+                      color = pl$IsBorrowerHomeowner), data = pl2) + 
+ geom_boxplot() + scale_colour_manual(values = c('#DA0463', "#283149")) +
+  xlab('Income Range') + ylab('Borrower Rate') +
+  labs(color = "Borrower Owns a Home") + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+grid.arrange(BRvPR_H,BRvIR_H)
+```
+
+In the previous section we said that we wanted to investigate more the 
+*IsBorrowerHomeOwner* feature together with other variable that appeared to be
+highly correlated with BorrowerRate. Above you can see that the difference
+(in terms of interest rate) between owning a house or not is almost always
+minimal, across all levels of rating. The big difference lies in the not 
+labeled data where a strong difference is present.
+
+However, in the plot right below, we see that owning a house does make a 
+difference when looking at the interest rate that a borrower is charged, 
+against their *IncomeRange*.
+
+```{r  echo=FALSE, message=F, warning=F}
+p3 <- ggplot(aes(y = pl2$BorrowerRate, x = pl$StatedMonthlyIncome, color = pl$IsBorrowerHomeowner), data = pl2) + 
+  xlim(0, 50000) + 
+ geom_point(alpha = 0.02, position = position_jitter()) + 
+  scale_colour_manual(values = c('#DA0463', "#283149")) +
+  xlab('Stated Monthly Income') + ylab('Borrower Rate') +
+  labs(color = "Borrower Owns a Home")
+
+p4 <- ggplot(aes(y = pl2$BorrowerRate, x = pl$StatedMonthlyIncome, color = pl$IsBorrowerHomeowner), data = pl2) + 
+  xlim(0, 50000) + 
+  geom_density2d() + scale_colour_manual(values = c('#DA0463', "#283149")) +
+  xlab('Stated Monthly Income') + ylab('Borrower Rate') +
+  labs(color = "Borrower Owns a Home")
+grid.arrange(p3,p4)
+
+```
+
+I wanted to substitute the *IncomeRange* variable, with a non-categorical one.
+This allows us to draw a different kind of plot,
+while garnering more information on
+essentially the same question.
+
+The plot above, shows a lot of overplotting, notwithstanding the reduced alpha.
+However, we can definitely see that typically the homeowners tend to make more
+money than those who do not own a house. The plot right below is extremely
+helpful, as we can see that the black and red high density levels, located in
+the souther region of the plot, have a non-negligeble difference in terms of
+*BorrowerRate*.
+
+```{r  echo=FALSE, message=F, warning=F}
+ggplot(aes(y = pl$ProsperScore, x = pl$EmploymentStatus, 
+           color = pl$IsBorrowerHomeowner), data = pl2) + 
+ geom_boxplot() + scale_colour_manual(values = c('#DA0463', "#283149")) +
+xlab('Employment Status') + ylab('Prosper Score') +
+  labs(color = "Borrower Owns a Home") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+We said above that PropserScore looks very similar to ProsperRating. They appear
+to measure the same thing. However, the advantage of ProsperScore lies in its
+numeric nature, meaning that we are not forced to treat it like a factor, which
+in turns allows as to easily plot it against a categorical value.
+
+Above we see that within this dataset, owning a house might be harmful 
+depending of your employment status. This plot actually raises more questions
+than it gives answers: why, for instance, your score would benefit from you not
+having a house in case you are jobless or part-time employed?
+
+```{r  echo=FALSE, message=F, warning=F}
+ggplot(aes(y = (pl$ProsperRating..Alpha.), x = pl$StatedMonthlyIncome, color = pl$TradesNeverDelinquent..percentage.), data = pl2) + 
+  xlim(0, 50000) + 
+ geom_point(alpha = .05, position = position_jitter()) +
+  scale_y_discrete(limits = c("","HR", "E", "D", "C", "B", "A", "AA")) +
+  scale_color_gradient2(high = "#DA0463", midpoint = 0.50, mid = "#404B69",
+                       low = "#283149", name ='% of Trades Never Delinquent') +
+  xlab('Stated Monthly Income') + ylab('Prosper Rating')
+```
+
+I decided to draw this plot primarily to shed more lights on the suspects I had
+above when I said that the unlabeled data (in terms of Score) looked like yet 
+another bin for very poor performers in terms of *TradesNeverDelinquent*.
+As we said before, Rating and Score look very similar in aim, so I decided to
+check if this pattern was emerging here as well. As we can see, the more 
+blackish
+stripe is not HR, but the unlabeled one. This plot also reveals that the highest
+rated loans are almost never issued to people without an income (or with a very
+low one). Moreover, as one would expect, there are less entries that hold a high
+income for the lowest levels of ratings.
+
+# Multivariate Analysis
+
+### Talk about some of the relationships you observed in this part of the \
+investigation. Were there features that strengthened each other in terms of \
+looking at your feature(s) of interest?
+
+The most interesting finding in this section, in my opinion is that owning a 
+house does not always reduce the borrower interest rate. One would expect that
+owning a house would  alwaysdecrease the risk for the lender and 
+in turn the interest rate,
+but in case you are unemployed, within this dataset
+you'd receive an higher rate on average. It is also clear that the variables
+*ProsperScore*, *BorrowerRate* and *ProsperRating..Alpha.* are strongly 
+correlated with each other: we have said several times that Score and rating
+seem to have a similar aim and indeed you see how people not employed have a 
+lower score if they own a house.
+
+### Were there any interesting or surprising interactions between features?
+The surprising interactions were largely utlined above, however, an extra
+finding worth noticing is about that spike in distribution we have noticed
+around the 32% interest rate in the univariate section. We could not find an
+immediate explanation. It seems clear now that almost all the HR loans hover
+around that rate, as if it was the "go-to" interest rate in case you were 
+labeled with HR.
+
+------
+
+# Final Plots and Summary
+
+### Plot One
+
+```{r echo=FALSE, Plot_One, message=F, warning=F}
+
+ggplot(aes(y = pl2$BorrowerRate, x = pl$StatedMonthlyIncome, color = pl$IsBorrowerHomeowner), data = pl2) + 
+  xlim(0, 50000) + 
+  geom_density2d( alpha = .7) + scale_color_manual(values = c('#DA0463', "#283149")) +
+  xlab('Stated Monthly Income') + ylab('Borrower Rate') +
+  labs(color = "Borrower Owns a Home") + 
+  ggtitle('Borrower Rate by Stated Monthly Income by Borrower Home Ownership')
+```
+
+### Description One
+I decided to focus on this plot  because thanks the density
+curves, allow us to identify were the data lumps together:
+we see that there are three peaks of distribution around three levels of rates.
+These peaks are at around the same levels for both owners and not owners
+although the southermost peak highlights a difference between who owns a house
+and who does not. 
+I believe the curves were an effective way 
+to avoid the problems of overplotting.
+
+
+### Plot Two
+```{r echo=FALSE, Plot_Two, message=F, warning=F}
+CD <- ggplot(aes(x = pl2$CurrentDelinquencies, y = pl2$BorrowerRate),
+       data = pl2) + xlim(0, 30) +  ylim(0.05, quantile(pl2$BorrowerRate, .995)) +
+ geom_point(alpha = 1/25, color = I('#DA0463'), position = position_jitter())  + 
+ coord_trans(x = 'sqrt') +
+ geom_smooth(color = I("#283149")) + ylab( "Borrower Rate") +
+  xlab("Current Delinquencies") + 
+  ggtitle("Borrower Rate by Current Delinquencies") 
+PD <-ggplot(aes(x = pl2$DelinquenciesLast7Years, y = pl2$BorrowerRate),
+       data = pl2) + xlim(0, 70) +  ylim(0.05, quantile(pl2$BorrowerRate, .995)) +
+ geom_point(alpha = 1/25, color = I('#DA0463'), position = position_jitter())  + 
+ coord_trans(x = 'sqrt') +
+ geom_smooth(color = I("#283149")) + ylab( "Borrower Rate") +
+  xlab("Delinquencies in the Last 7 Years") +
+    ggtitle("Borrower Rate by Past Delinquencies") 
+
+
+grid.arrange(CD,PD,ncol=2) 
+```
+
+### Description Two
+These two plots were useful to idntify a trend within the dataset: how 
+delinquencies correlate with
+the interest rate of the borrowers. In general, the higher
+the delinquencies (both past and current) the higher the rate, 
+although at the same time, at very high levels
+of delinquencies the data becomes more and more sparse and the line of tendency
+is no longer very clear and accurate. 
+
+### Plot Three
+```{r echo=FALSE, Plot_Three, message=F, warning=F}
+ggplot(aes(y = (pl$ProsperRating..Alpha.), x = pl$StatedMonthlyIncome, color = pl$TradesNeverDelinquent..percentage.), data = pl2) + 
+  xlim(0, 50000) + 
+ geom_point(alpha = .05, position = position_jitter()) +
+  scale_y_discrete(limits = c("","HR", "E", "D", "C", "B", "A", "AA")) +
+  scale_color_gradient2(high = "#DA0463", midpoint = 0.50, mid = "#404B69",
+                       low = "#283149", name ='% of Trades Never Delinquent') +
+  xlab('Stated Monthly Income') +
+  ylab('Prosper Rating')
+    ggtitle("Rating by Stated Monthly income by % of Trades Never Delinquent ") 
+
+```
+
+### Description Three
+
+This plot is by far the most interesting in my opinion. It helps us notice that
+the Borrower's with the highest ratings very rarely have a 0 USD monthly income.
+More importantly, The "purest" shades of red belong to the best ratings. A 
+non-banal finding is that unlabeled data ranked as the worst performer
+in terms of delinquencies. I believe this to be an added value as it allows us
+to shed lights on data that held no label.
+
+------
+
+# Reflection
+
+I started this project with the aim to explore how some of the personal 
+characteristics of the borrowers might correlate with the interest rate and
+the rating of the borrower. I also wanted to confirm some of the beliefs I had,
+which in few cases were disproved (*ex multis* the importance of owning a house)
+in bargaining a lower interest rate.
+
+I went through several technical struggles, I had to start ovr several times
+as the features I had initially selected did not hold interesting correlations
+with each other and ultimately, it took me a lot of trial and error before I 
+could find the features that, if explored together, would garner some meaningful
+insight.
+
+It was overall great to learn how powerful can R be in drawing compelling
+visualizations in so few (sometimes one) line of code.
